@@ -12,18 +12,24 @@ from PIL import ImageTk, Image
 keep_running = True
 
 def load_credentials():
+    if not os.path.isfile("credentials.json"):
+        return {"error": "ERROR: **credentials.json** file does not exist.\nPlease create this file by copying and renaming credentials.dist.json file. Restart application."}
     with open("credentials.json") as file:
         credentials = json.load(file)
     return credentials
 
 credentials = load_credentials()
 
-mastodon = Mastodon(
-    client_id=credentials["client_key"],
-    client_secret=credentials["client_secret"],
-    access_token=credentials["access_token"],
-    api_base_url=credentials["api_base_url"]
-)
+welcome_message = "Welcome to P1X Mastodon Reader\nCoded by Krzysztof Krystian Jankowski"
+if "error" in credentials:
+    welcome_message += "\n\n"+credentials["error"]
+else:
+    mastodon = Mastodon(
+        client_id=credentials["client_key"],
+        client_secret=credentials["client_secret"],
+        access_token=credentials["access_token"],
+        api_base_url=credentials["api_base_url"]
+    )
 
 def strip_html(html):
     soup = BeautifulSoup(html, features="html.parser")
@@ -35,9 +41,6 @@ def speak(text):
     os.system("mpg123 temp.mp3")
     os.remove("temp.mp3")
 
-def stop():
-    global keep_running
-    keep_running = False
 
 def main(welcome_label):
     global keep_running
@@ -68,9 +71,19 @@ def main(welcome_label):
         # Wait for 10 seconds before checking for new notifications
         time.sleep(10)
 
-def start(welcome_label):
+def start(welcome_text, start_button, stop_button):
+    if "error" in credentials:
+        return
+    start_button.pack_forget()
+    stop_button.pack(side="left", padx=8, pady=8)
     speak(welcome_message)
-    threading.Thread(target=main, args=(welcome_label,)).start()
+    threading.Thread(target=main, args=(welcome_text,)).start()
+
+def stop(stop_button, start_button):
+    global keep_running
+    keep_running = False
+    stop_button.pack_forget()
+    start_button.pack(side="right", padx=8, pady=8)
 
 if __name__ == '__main__':
     root = tk.Tk()
@@ -81,14 +94,14 @@ if __name__ == '__main__':
     panel = tk.Label(root, image=img)
     panel.pack(side="top", fill="both", expand="yes")
 
-    welcome_message = "Welcome to P1X Mastodon Reader by Krzysztof Krystian Jankowski"
-    welcome_label = tk.Label(root, text=welcome_message)
-    welcome_label.pack()
+    welcome_text = tk.Text(root, width=55, height=6)
+    welcome_text.insert(tk.END, welcome_message)
+    welcome_text.pack(padx=8, pady=16)
 
-    start_button = tk.Button(root, text="Start", command=lambda: start(welcome_label))
-    start_button.pack()
+    start_button = tk.Button(root, text="Start reading notifications", command=lambda: start(welcome_text, start_button, stop_button))
+    start_button.pack(side="right", padx=8, pady=8)
 
-    stop_button = tk.Button(root, text="Stop", command=stop)
-    stop_button.pack()
+    stop_button = tk.Button(root, text="Stop", command=lambda: stop(stop_button, start_button))
+    stop_button.pack_forget()
 
     root.mainloop()
