@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 import os
 import tkinter as tk
 from PIL import ImageTk, Image
+from queue import Queue
 
 # Variable to control the main loop
 keep_running = True
@@ -19,6 +20,7 @@ def load_credentials():
     return credentials
 
 credentials = load_credentials()
+queue = Queue()
 
 welcome_message = "Welcome to P1X Mastodon Reader\nCoded by Krzysztof Krystian Jankowski"
 if "error" in credentials:
@@ -35,14 +37,26 @@ def strip_html(html):
     soup = BeautifulSoup(html, features="html.parser")
     return soup.get_text()
 
-def speak(text):
-    tts = gTTS(text=text, lang='en')
-    tts.save("temp.mp3")
-    os.system("mpg123 temp.mp3")
-    os.remove("temp.mp3")
+def speak_thread(welcome_widget):
+        def run():
+            import tempfile
+            while True:
+                text = queue.get().strip()  # Strip leading/trailing whitespace
+                if any(char.isalnum() for char in text):  # If the text contains any alphanumeric characters
+                    welcome_widget.delete("1.0", "end")
+                    welcome_widget.insert("1.0", text)
+                    tts = gTTS(text=text, lang='en')
+                    temp_filename = tempfile.mktemp(suffix=".mp3")
+                    tts.save(temp_filename)
+                    os.system(f"mpg123 {temp_filename}")
+                    os.remove(temp_filename)
+                queue.task_done()
+
+        thread = threading.Thread(target=run)
+        thread.start()
 
 
-def main(welcome_label):
+def main(welcome_widget):
     global keep_running
     last_notification_id = None
 
@@ -62,11 +76,8 @@ def main(welcome_label):
                     content = strip_html(notification['status']['content'])
                     text_to_speak += f". Message: {content}"
 
-                # Update the label text
-                welcome_label.config(text=text_to_speak)
-
                 # Speak out the notification
-                speak(text_to_speak)
+                queue.put(text_to_speak)
 
         # Wait for 10 seconds before checking for new notifications
         time.sleep(10)
@@ -76,7 +87,7 @@ def start(welcome_text, start_button, stop_button):
         return
     start_button.pack_forget()
     stop_button.pack(side="left", padx=8, pady=8)
-    speak(welcome_message)
+    queue.put(welcome_message)
     threading.Thread(target=main, args=(welcome_text,)).start()
 
 def stop(stop_button, start_button):
@@ -90,6 +101,8 @@ if __name__ == '__main__':
     root.title('P1X Mastodon Reader')
     root.resizable(False, False)
 
+
+
     img = ImageTk.PhotoImage(Image.open('header_image.gif'))  # replace 'header_image.gif' with your image file
     panel = tk.Label(root, image=img)
     panel.pack(side="top", fill="both", expand="yes")
@@ -97,6 +110,8 @@ if __name__ == '__main__':
     welcome_text = tk.Text(root, width=55, height=6)
     welcome_text.insert(tk.END, welcome_message)
     welcome_text.pack(padx=8, pady=16)
+
+    speak_thread(welcome_text)
 
     start_button = tk.Button(root, text="Start reading notifications", command=lambda: start(welcome_text, start_button, stop_button))
     start_button.pack(side="right", padx=8, pady=8)
