@@ -38,7 +38,7 @@ def strip_html(html):
     soup = BeautifulSoup(html, features="html.parser")
     return soup.get_text()
 
-def speak_thread(welcome_widget):
+def speak_thread(welcome_widget, emoji_label):
         def run():
             import tempfile
             while True:
@@ -46,9 +46,10 @@ def speak_thread(welcome_widget):
                 if any(char.isalnum() for char in text):  # If the text contains any alphanumeric characters
                     welcome_widget.delete("1.0", "end")
                     welcome_widget.insert("1.0", text)
-                    subprocess.run(['spd-say', '-p', '-20', '-l', 'us', text])
+                    emoji_label.config(text="(o.O )")
+                    subprocess.run(['spd-say', '-p', '-20', '-l', 'us', '-w', text])
                 audio_queue.task_done()
-
+                emoji_label.config(text="(-.- )")
 
         thread = threading.Thread(target=run)
         thread.start()
@@ -85,7 +86,7 @@ def start(welcome_text, start_button, stop_button, emoji_label):
         return
     start_button.pack_forget()
     stop_button.pack(side="left", padx=8, pady=8)
-    audio_queue.put(welcome_message)
+
     threading.Thread(target=main, args=(welcome_text,)).start()
     emoji_label.config(text="(o.O )")
 
@@ -107,8 +108,8 @@ if __name__ == '__main__':
     welcome_text = tk.Text(root, width=55, height=6)
     welcome_text.insert(tk.END, welcome_message)
     welcome_text.pack(padx=8, pady=16)
-
-    speak_thread(welcome_text)
+    audio_queue.put(welcome_message)
+    speak_thread(welcome_text,emoji_label)
 
     start_button = tk.Button(root, text="Start reading notifications", command=lambda: start(welcome_text, start_button, stop_button, emoji_label))
     start_button.pack(side="right", padx=8, pady=8)
