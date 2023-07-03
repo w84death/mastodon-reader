@@ -1,8 +1,9 @@
 import time
 import json
 import threading
+
+import subprocess
 from mastodon import Mastodon
-from gtts import gTTS
 from bs4 import BeautifulSoup
 import os
 import tkinter as tk
@@ -20,7 +21,7 @@ def load_credentials():
     return credentials
 
 credentials = load_credentials()
-queue = Queue()
+audio_queue = Queue()
 
 welcome_message = "Welcome to P1X Mastodon Reader\nCoded by Krzysztof Krystian Jankowski"
 if "error" in credentials:
@@ -41,16 +42,13 @@ def speak_thread(welcome_widget):
         def run():
             import tempfile
             while True:
-                text = queue.get().strip()  # Strip leading/trailing whitespace
+                text = audio_queue.get().strip()  # Strip leading/trailing whitespace
                 if any(char.isalnum() for char in text):  # If the text contains any alphanumeric characters
                     welcome_widget.delete("1.0", "end")
                     welcome_widget.insert("1.0", text)
-                    tts = gTTS(text=text, lang='en')
-                    temp_filename = tempfile.mktemp(suffix=".mp3")
-                    tts.save(temp_filename)
-                    os.system(f"mpg123 {temp_filename}")
-                    os.remove(temp_filename)
-                queue.task_done()
+                    subprocess.run(['spd-say', '-p', '-20', '-l', 'us', text])
+                audio_queue.task_done()
+
 
         thread = threading.Thread(target=run)
         thread.start()
@@ -77,35 +75,34 @@ def main(welcome_widget):
                     text_to_speak += f". Message: {content}"
 
                 # Speak out the notification
-                queue.put(text_to_speak)
+                audio_queue.put(text_to_speak)
 
-        # Wait for 10 seconds before checking for new notifications
-        time.sleep(10)
+        # Wait for 10min before checking for new notifications
+        time.sleep(10*60)
 
-def start(welcome_text, start_button, stop_button):
+def start(welcome_text, start_button, stop_button, emoji_label):
     if "error" in credentials:
         return
     start_button.pack_forget()
     stop_button.pack(side="left", padx=8, pady=8)
-    queue.put(welcome_message)
+    audio_queue.put(welcome_message)
     threading.Thread(target=main, args=(welcome_text,)).start()
+    emoji_label.config(text="(o.O )")
 
-def stop(stop_button, start_button):
+def stop(stop_button, start_button, emoji_label):
     global keep_running
     keep_running = False
     stop_button.pack_forget()
     start_button.pack(side="right", padx=8, pady=8)
+    emoji_label.config(text="(-.- )")
 
 if __name__ == '__main__':
     root = tk.Tk()
     root.title('P1X Mastodon Reader')
     root.resizable(False, False)
 
-
-
-    img = ImageTk.PhotoImage(Image.open('header_image.gif'))  # replace 'header_image.gif' with your image file
-    panel = tk.Label(root, image=img)
-    panel.pack(side="top", fill="both", expand="yes")
+    emoji_label = tk.Label(root,text="(-.- )",font=("TkDefaultFont", 48))
+    emoji_label.pack(pady=8)
 
     welcome_text = tk.Text(root, width=55, height=6)
     welcome_text.insert(tk.END, welcome_message)
@@ -113,10 +110,10 @@ if __name__ == '__main__':
 
     speak_thread(welcome_text)
 
-    start_button = tk.Button(root, text="Start reading notifications", command=lambda: start(welcome_text, start_button, stop_button))
+    start_button = tk.Button(root, text="Start reading notifications", command=lambda: start(welcome_text, start_button, stop_button, emoji_label))
     start_button.pack(side="right", padx=8, pady=8)
 
-    stop_button = tk.Button(root, text="Stop", command=lambda: stop(stop_button, start_button))
+    stop_button = tk.Button(root, text="Stop", command=lambda: stop(stop_button, start_button, emoji_label))
     stop_button.pack_forget()
 
     root.mainloop()
