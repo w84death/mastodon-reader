@@ -7,7 +7,7 @@ Reads (audio) notifications from Mastodon instance.
 Here are all the Python libraries that are needed to be installed using pip for the script:
 
 * Mastodon.py: A Python wrapper for the Mastodon (a federated social network) API.
-* native Linux Text to Speech API.
+* Screen reader: Speech Dispatcher (spd-say).
 * beautifulsoup4: A Python library for pulling data out of HTML and XML files.
 
 You can install these dependencies using the following pip commands:
